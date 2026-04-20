@@ -88,7 +88,7 @@ describe("adapter model listing", () => {
   it("loads cursor models dynamically and caches them", async () => {
     const runner = vi.fn(() => ({
       status: 0,
-      stdout: "Available models: auto, composer-1.5, gpt-5.3-codex-high, sonnet-4.6",
+      stdout: "Available models: auto, composer-2, gpt-5.3-codex-high, claude-4.6-sonnet-medium",
       stderr: "",
       hasError: false,
     }));
@@ -101,7 +101,7 @@ describe("adapter model listing", () => {
     expect(first).toEqual(second);
     expect(first.some((model) => model.id === "auto")).toBe(true);
     expect(first.some((model) => model.id === "gpt-5.3-codex-high")).toBe(true);
-    expect(first.some((model) => model.id === "composer-1")).toBe(true);
+    expect(first.some((model) => model.id === "composer-2")).toBe(true);
   });
 
 });
