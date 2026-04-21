@@ -709,4 +709,130 @@ describe("issue comment reopen routes", () => {
       }),
     );
   });
+
+  it("does not implicitly reopen terminal issues via POST comments for non-governing agents", async () => {
+    mockIssueService.getById.mockResolvedValue(makeIssue("done"));
+    mockAgentService.getById.mockResolvedValue({
+      id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      companyId: "company-1",
+      role: "cto",
+    });
+
+    const res = await request(
+      await installActor(createApp(), {
+        type: "agent",
+        agentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        companyId: "company-1",
+        runId: "run-cto",
+      }),
+    )
+      .post("/api/issues/11111111-1111-4111-8111-111111111111/comments")
+      .send({ body: "FYI after closure" });
+
+    expect(res.status).toBe(201);
+    expect(mockIssueService.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects reopen=true on POST comments for non-governing agents", async () => {
+    mockIssueService.getById.mockResolvedValue(makeIssue("done"));
+    mockAgentService.getById.mockResolvedValue({
+      id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      companyId: "company-1",
+      role: "cto",
+    });
+
+    const res = await request(
+      await installActor(createApp(), {
+        type: "agent",
+        agentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        companyId: "company-1",
+        runId: "run-cto",
+      }),
+    )
+      .post("/api/issues/11111111-1111-4111-8111-111111111111/comments")
+      .send({ body: "Please reopen", reopen: true });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe("ISSUE_REOPEN_FORBIDDEN");
+  });
+
+  it("allows the CEO agent to reopen a terminal issue via PATCH without a comment", async () => {
+    mockIssueService.getById.mockResolvedValue(makeIssue("done"));
+    mockAgentService.getById.mockResolvedValue({
+      id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      companyId: "company-1",
+      role: "ceo",
+    });
+    mockIssueService.update.mockImplementation(async (_id: string, patch: Record<string, unknown>) => ({
+      ...makeIssue("done"),
+      ...patch,
+    }));
+
+    const res = await request(
+      await installActor(createApp(), {
+        type: "agent",
+        agentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        companyId: "company-1",
+        runId: "run-ceo",
+      }),
+    )
+      .patch("/api/issues/11111111-1111-4111-8111-111111111111")
+      .send({ reopen: true });
+
+    expect(res.status).toBe(200);
+    expect(mockIssueService.update).toHaveBeenCalledWith(
+      "11111111-1111-4111-8111-111111111111",
+      expect.objectContaining({
+        status: "todo",
+        actorAgentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      }),
+    );
+  });
+
+  it("rejects direct status transition off terminal for non-governing agents", async () => {
+    mockIssueService.getById.mockResolvedValue(makeIssue("done"));
+    mockAgentService.getById.mockResolvedValue({
+      id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      companyId: "company-1",
+      role: "cto",
+    });
+
+    const res = await request(
+      await installActor(createApp(), {
+        type: "agent",
+        agentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        companyId: "company-1",
+        runId: "run-cto",
+      }),
+    )
+      .patch("/api/issues/11111111-1111-4111-8111-111111111111")
+      .send({ status: "todo" });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe("ISSUE_REOPEN_FORBIDDEN");
+    expect(mockIssueService.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects PATCH reopen=true for non-governing agents", async () => {
+    mockIssueService.getById.mockResolvedValue(makeIssue("done"));
+    mockAgentService.getById.mockResolvedValue({
+      id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      companyId: "company-1",
+      role: "cto",
+    });
+
+    const res = await request(
+      await installActor(createApp(), {
+        type: "agent",
+        agentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        companyId: "company-1",
+        runId: "run-cto",
+      }),
+    )
+      .patch("/api/issues/11111111-1111-4111-8111-111111111111")
+      .send({ reopen: true });
+
+    expect(res.status).toBe(403);
+    expect(mockIssueService.update).not.toHaveBeenCalled();
+  });
 });

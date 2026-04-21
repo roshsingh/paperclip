@@ -491,6 +491,13 @@ export function issueRoutes(
     return true;
   }
 
+  async function canGovernTerminalIssueReopen(req: Request, companyId: string) {
+    if (req.actor.type === "board") return true;
+    if (req.actor.type !== "agent" || !req.actor.agentId) return false;
+    const actorAgent = await agentsSvc.getById(req.actor.agentId);
+    return Boolean(actorAgent && actorAgent.companyId === companyId && actorAgent.role === "ceo");
+  }
+
   async function resolveActiveIssueRun(issue: {
     id: string;
     assigneeAgentId: string | null;
@@ -1525,6 +1532,7 @@ export function issueRoutes(
     if (!(await assertAgentIssueMutationAllowed(req, res, existing))) return;
 
     const actor = getActorInfo(req);
+    const governedReopenActor = await canGovernTerminalIssueReopen(req, existing.companyId);
     const isClosed = isClosedIssueStatus(existing.status);
     const normalizedAssigneeAgentId = await normalizeIssueAssigneeAgentReference(
       existing.companyId,
@@ -1543,9 +1551,18 @@ export function issueRoutes(
     } = req.body;
     const requestedAssigneeAgentId =
       normalizedAssigneeAgentId === undefined ? existing.assigneeAgentId : normalizedAssigneeAgentId;
+    if (reopenRequested && !governedReopenActor) {
+      res.status(403).json({
+        error: "ISSUE_REOPEN_FORBIDDEN",
+        message: "Reopening a terminal issue requires board access or the company CEO agent.",
+        details: { issueId: existing.id },
+      });
+      return;
+    }
     const effectiveReopenRequested =
       reopenRequested ||
-      (!!commentBody &&
+      (governedReopenActor &&
+        !!commentBody &&
         shouldImplicitlyReopenCommentForAgent({
           issueStatus: existing.status,
           assigneeAgentId: requestedAssigneeAgentId,
@@ -1594,7 +1611,7 @@ export function issueRoutes(
     if (hiddenAtRaw !== undefined) {
       updateFields.hiddenAt = hiddenAtRaw ? new Date(hiddenAtRaw) : null;
     }
-    if (commentBody && effectiveReopenRequested && isClosed && updateFields.status === undefined) {
+    if (effectiveReopenRequested && isClosed && updateFields.status === undefined) {
       updateFields.status = "todo";
     }
     if (req.body.executionPolicy !== undefined) {
@@ -1656,6 +1673,22 @@ export function issueRoutes(
       if (!isAgentReturningIssueToCreator) {
         await assertCanAssignTasks(req, existing.companyId);
       }
+    }
+
+    const mergedNextStatusBeforeUpdate =
+      typeof updateFields.status === "string" ? updateFields.status : existing.status;
+    if (
+      isClosedIssueStatus(existing.status) &&
+      !isClosedIssueStatus(mergedNextStatusBeforeUpdate) &&
+      mergedNextStatusBeforeUpdate !== existing.status &&
+      !governedReopenActor
+    ) {
+      res.status(403).json({
+        error: "ISSUE_REOPEN_FORBIDDEN",
+        message: "Transitioning a terminal issue to a non-terminal status requires board access or the company CEO agent.",
+        details: { issueId: existing.id, from: existing.status, to: mergedNextStatusBeforeUpdate },
+      });
+      return;
     }
 
     let issue;
@@ -1753,11 +1786,9 @@ export function issueRoutes(
 
     const hasFieldChanges = Object.keys(previous).length > 0;
     const reopened =
-      commentBody &&
-      effectiveReopenRequested &&
-      isClosed &&
-      previous.status !== undefined &&
-      issue.status === "todo";
+      isClosedIssueStatus(existing.status) &&
+      !isClosedIssueStatus(issue.status) &&
+      existing.status !== issue.status;
     const reopenFromStatus = reopened ? existing.status : null;
     await logActivity(db, {
       companyId: issue.companyId,
@@ -2039,6 +2070,30 @@ export function issueRoutes(
             },
           });
         }
+      }
+
+      if (reopened && issue.assigneeAgentId && !comment) {
+        addWakeup(issue.assigneeAgentId, {
+          source: "automation",
+          triggerDetail: "system",
+          reason: "issue_reopened_via_comment",
+          payload: {
+            issueId: issue.id,
+            mutation: "update",
+            reopenedFrom: reopenFromStatus,
+            ...(interruptedRunId ? { interruptedRunId } : {}),
+          },
+          requestedByActorType: actor.actorType,
+          requestedByActorId: actor.actorId,
+          contextSnapshot: {
+            issueId: issue.id,
+            taskId: issue.id,
+            source: "issue.update.reopen",
+            wakeReason: "issue_reopened_via_comment",
+            reopenedFrom: reopenFromStatus,
+            ...(interruptedRunId ? { interruptedRunId } : {}),
+          },
+        });
       }
 
       const becameDone = existing.status !== "done" && issue.status === "done";
@@ -2474,17 +2529,27 @@ export function issueRoutes(
     }
 
     const actor = getActorInfo(req);
+    const governedReopenActor = await canGovernTerminalIssueReopen(req, issue.companyId);
     const reopenRequested = req.body.reopen === true;
     const interruptRequested = req.body.interrupt === true;
     const isClosed = isClosedIssueStatus(issue.status);
+    if (reopenRequested && !governedReopenActor) {
+      res.status(403).json({
+        error: "ISSUE_REOPEN_FORBIDDEN",
+        message: "Reopening a terminal issue requires board access or the company CEO agent.",
+        details: { issueId: issue.id },
+      });
+      return;
+    }
     const effectiveReopenRequested =
       reopenRequested ||
-      shouldImplicitlyReopenCommentForAgent({
-        issueStatus: issue.status,
-        assigneeAgentId: issue.assigneeAgentId,
-        actorType: actor.actorType,
-        actorId: actor.actorId,
-      });
+      (governedReopenActor &&
+        shouldImplicitlyReopenCommentForAgent({
+          issueStatus: issue.status,
+          assigneeAgentId: issue.assigneeAgentId,
+          actorType: actor.actorType,
+          actorId: actor.actorId,
+        }));
     let reopened = false;
     let reopenFromStatus: string | null = null;
     let interruptedRunId: string | null = null;
