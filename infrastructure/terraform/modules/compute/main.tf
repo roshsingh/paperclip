@@ -87,6 +87,7 @@ resource "aws_ecs_task_definition" "paperclip" {
           { name = "PAPERCLIP_PUBLIC_URL", value = var.paperclip_public_url },
           { name = "PAPERCLIP_API_URL", value = var.paperclip_public_url },
           { name = "PAPERCLIP_TELEMETRY_DISABLED", value = "1" },
+          { name = "NODE_TLS_REJECT_UNAUTHORIZED", value = "0" },
         ],
         var.paperclip_allowed_hostnames != "" ? [{ name = "PAPERCLIP_ALLOWED_HOSTNAMES", value = var.paperclip_allowed_hostnames }] : []
       )

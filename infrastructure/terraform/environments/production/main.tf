@@ -102,7 +102,7 @@ module "database" {
 resource "aws_secretsmanager_secret_version" "database_url" {
   secret_id = aws_secretsmanager_secret.database_url.id
   secret_string = format(
-    "postgres://postgres:%s@%s/paperclip?ssl=true",
+    "postgres://postgres:%s@%s/paperclip?sslmode=require",
     urlencode(var.db_password),
     module.database.endpoint
   )
