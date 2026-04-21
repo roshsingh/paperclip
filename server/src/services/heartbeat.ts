@@ -3755,6 +3755,14 @@ export function heartbeatService(db: Db) {
         continue;
       }
 
+      // Latest run finished successfully — the agent is idle, not mid-flight stranded.
+      // Re-enqueueing `issue_continuation_needed` here spams wake loops (issue stays `in_progress`
+      // waiting on humans). New work should arrive via comments, assignment, or manual wake.
+      if (latestRun?.status === "succeeded") {
+        result.skipped += 1;
+        continue;
+      }
+
       if (didAutomaticRecoveryFail(latestRun, "issue_continuation_needed")) {
         const failureSummary = summarizeRunFailureForIssueComment(latestRun);
         const updated = await escalateStrandedAssignedIssue({
