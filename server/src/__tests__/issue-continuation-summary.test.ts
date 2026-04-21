@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ISSUE_CONTINUATION_FAILURE_NEXT_ACTION,
   ISSUE_CONTINUATION_SUMMARY_MAX_BODY_CHARS,
   buildContinuationSummaryMarkdown,
 } from "../services/issue-continuation-summary.js";
@@ -81,6 +82,43 @@ describe("issue continuation summaries", () => {
     });
 
     expect(body).toContain("Latest run error (adapter_failed): adapter failed");
-    expect(body).toContain("Inspect the failed run, fix the cause");
+    expect(body).toContain(ISSUE_CONTINUATION_FAILURE_NEXT_ACTION);
+  });
+
+  it("does not carry failure next-action text after a succeeded run", () => {
+    const previousBody = [
+      "# Continuation Summary",
+      "",
+      "## Next Action",
+      "",
+      `- ${ISSUE_CONTINUATION_FAILURE_NEXT_ACTION}`,
+    ].join("\n");
+
+    const body = buildContinuationSummaryMarkdown({
+      issue: {
+        id: "issue-1",
+        identifier: "PAP-1579",
+        title: "Recover after transient adapter failure",
+        description: null,
+        status: "in_progress",
+        priority: "high",
+      },
+      run: {
+        id: "run-ok",
+        status: "succeeded",
+        error: null,
+        resultJson: { summary: "Green build; no adapter error." },
+        finishedAt: new Date("2026-04-21T10:00:00.000Z"),
+      },
+      agent: {
+        id: "agent-1",
+        name: "Cursor",
+        adapterType: "cursor",
+      },
+      previousSummaryBody: previousBody,
+    });
+
+    expect(body).toContain("Run `run-ok` finished with status `succeeded`");
+    expect(body).not.toContain("Inspect the failed run");
   });
 });

@@ -96,14 +96,32 @@ function inferMode(issue: IssueSummaryInput, run: RunSummaryInput) {
   return "implementation";
 }
 
+export const ISSUE_CONTINUATION_FAILURE_NEXT_ACTION =
+  "Inspect the failed run, fix the cause, and resume from the most recent concrete action above.";
+
+const DEFAULT_RESUME_NEXT_ACTION =
+  "Resume implementation from the acceptance criteria, latest comments, and this summary.";
+
+function isStaleFailureNextAction(previous: string | null) {
+  if (!previous) return false;
+  return (
+    previous === ISSUE_CONTINUATION_FAILURE_NEXT_ACTION ||
+    previous.toLowerCase().includes("inspect the failed run")
+  );
+}
+
 function inferNextAction(issue: IssueSummaryInput, run: RunSummaryInput, previousNextAction: string | null) {
   if (issue.status === "done") return "Review the completed issue output and close any remaining follow-up comments.";
   if (issue.status === "in_review") return "Wait for reviewer feedback or approval before continuing executor work.";
   if (run.status === "failed" || run.status === "timed_out") {
-    return "Inspect the failed run, fix the cause, and resume from the most recent concrete action above.";
+    return ISSUE_CONTINUATION_FAILURE_NEXT_ACTION;
   }
   if (run.status === "cancelled") return "Confirm the cancellation reason before starting another run.";
-  return previousNextAction ?? "Resume implementation from the acceptance criteria, latest comments, and this summary.";
+  // Succeeded (or other non-terminal-for-triage states): do not carry forward a failure-triage line from a prior run.
+  if (run.status === "succeeded" && isStaleFailureNextAction(previousNextAction)) {
+    return DEFAULT_RESUME_NEXT_ACTION;
+  }
+  return previousNextAction ?? DEFAULT_RESUME_NEXT_ACTION;
 }
 
 function bulletList(items: string[], empty: string) {
