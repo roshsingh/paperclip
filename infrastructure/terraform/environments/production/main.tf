@@ -54,6 +54,10 @@ resource "aws_secretsmanager_secret" "claude_oauth_token" {
   name = "paperclip/${var.environment}/claude-oauth-token"
 }
 
+resource "aws_secretsmanager_secret" "github_token" {
+  name = "paperclip/${var.environment}/github-token"
+}
+
 resource "aws_secretsmanager_secret_version" "better_auth" {
   secret_id     = aws_secretsmanager_secret.better_auth.id
   secret_string = random_password.better_auth.result
@@ -84,6 +88,7 @@ module "security" {
     aws_secretsmanager_secret.database_url.arn,
     aws_secretsmanager_secret.better_auth.arn,
     aws_secretsmanager_secret.claude_oauth_token.arn,
+    aws_secretsmanager_secret.github_token.arn,
   ]
 }
 
@@ -195,6 +200,7 @@ locals {
     { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn },
     { name = "BETTER_AUTH_SECRET", valueFrom = aws_secretsmanager_secret.better_auth.arn },
     { name = "CLAUDE_CODE_OAUTH_TOKEN", valueFrom = aws_secretsmanager_secret.claude_oauth_token.arn },
+    { name = "GITHUB_TOKEN", valueFrom = aws_secretsmanager_secret.github_token.arn },
   ]
 }
 
