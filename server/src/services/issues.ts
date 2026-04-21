@@ -24,7 +24,8 @@ import {
 } from "@paperclipai/db";
 import type { IssueRelationIssueSummary } from "@paperclipai/shared";
 import { extractAgentMentionIds, extractProjectMentionIds, isUuidLike } from "@paperclipai/shared";
-import { conflict, notFound, unprocessable } from "../errors.js";
+import { conflict, HttpError, notFound, unprocessable } from "../errors.js";
+import { isTerminalHarnessIssueStatus } from "../lib/issue-terminal-status.js";
 import {
   defaultIssueExecutionWorkspaceSettingsForProject,
   gateProjectExecutionWorkspacePolicy,
@@ -1964,13 +1965,21 @@ export function issueService(db: Db) {
       }),
 
     checkout: async (id: string, agentId: string, expectedStatuses: string[], checkoutRunId: string | null) => {
-      const issueCompany = await db
-        .select({ companyId: issues.companyId })
+      const issueBrief = await db
+        .select({ companyId: issues.companyId, status: issues.status })
         .from(issues)
         .where(eq(issues.id, id))
         .then((rows) => rows[0] ?? null);
-      if (!issueCompany) throw notFound("Issue not found");
-      await assertAssignableAgent(issueCompany.companyId, agentId);
+      if (!issueBrief) throw notFound("Issue not found");
+      if (isTerminalHarnessIssueStatus(issueBrief.status)) {
+        throw new HttpError(
+          409,
+          "Cannot checkout a terminal issue without reopen.",
+          { issueId: id, status: issueBrief.status },
+          "ISSUE_TERMINAL",
+        );
+      }
+      await assertAssignableAgent(issueBrief.companyId, agentId);
 
       const now = new Date();
 

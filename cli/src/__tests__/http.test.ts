@@ -59,6 +59,29 @@ describe("PaperclipApiClient", () => {
     } satisfies Partial<ApiRequestError>);
   });
 
+  it("throws ApiRequestError with human message and errorCode for ISSUE_TERMINAL responses", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: "ISSUE_TERMINAL",
+          message: "Cannot checkout a terminal issue without reopen.",
+          details: { issueId: "1", status: "done" },
+        }),
+        { status: 409 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new PaperclipApiClient({ apiBase: "http://localhost:3100" });
+
+    await expect(client.post("/api/issues/1/checkout", {})).rejects.toMatchObject({
+      status: 409,
+      message: "Cannot checkout a terminal issue without reopen.",
+      errorCode: "ISSUE_TERMINAL",
+      details: { issueId: "1", status: "done" },
+    } satisfies Partial<ApiRequestError>);
+  });
+
   it("throws ApiConnectionError with recovery guidance when fetch fails", async () => {
     const fetchMock = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
     vi.stubGlobal("fetch", fetchMock);

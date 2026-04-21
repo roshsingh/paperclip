@@ -50,4 +50,20 @@ describe("errorHandler", () => {
     expect(res.err).toBe(err);
     expect(res.__errorContext?.error?.message).toBe("db exploded");
   });
+
+  it("serializes HttpError with publicErrorCode as stable machine-readable error + message", () => {
+    const req = makeReq();
+    const res = makeRes() as any;
+    const next = vi.fn() as unknown as NextFunction;
+    const err = new HttpError(409, "Cannot checkout a terminal issue without reopen.", { issueId: "i1" }, "ISSUE_TERMINAL");
+
+    errorHandler(err, req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "ISSUE_TERMINAL",
+      message: "Cannot checkout a terminal issue without reopen.",
+      details: { issueId: "i1" },
+    });
+  });
 });

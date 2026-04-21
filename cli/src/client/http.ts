@@ -4,12 +4,15 @@ export class ApiRequestError extends Error {
   status: number;
   details?: unknown;
   body?: unknown;
+  /** Machine-readable API error code when the server returns `{ error: code, message }`. */
+  errorCode?: string;
 
-  constructor(status: number, message: string, details?: unknown, body?: unknown) {
+  constructor(status: number, message: string, details?: unknown, body?: unknown, errorCode?: string) {
     super(message);
     this.status = status;
     this.details = details;
     this.body = body;
+    this.errorCode = errorCode;
   }
 }
 
@@ -186,12 +189,20 @@ async function toApiError(response: Response): Promise<ApiRequestError> {
 
   if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
     const body = parsed as Record<string, unknown>;
-    const message =
-      (typeof body.error === "string" && body.error.trim()) ||
-      (typeof body.message === "string" && body.message.trim()) ||
-      `Request failed with status ${response.status}`;
+    const errStr = typeof body.error === "string" ? body.error.trim() : "";
+    const msgStr = typeof body.message === "string" ? body.message.trim() : "";
+    let message: string;
+    let errorCode: string | undefined;
+    if (msgStr) {
+      message = msgStr;
+      if (errStr && errStr !== msgStr) errorCode = errStr;
+    } else if (errStr) {
+      message = errStr;
+    } else {
+      message = `Request failed with status ${response.status}`;
+    }
 
-    return new ApiRequestError(response.status, message, body.details, parsed);
+    return new ApiRequestError(response.status, message, body.details, parsed, errorCode);
   }
 
   return new ApiRequestError(response.status, `Request failed with status ${response.status}`, undefined, parsed);

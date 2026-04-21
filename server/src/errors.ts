@@ -1,11 +1,14 @@
 export class HttpError extends Error {
   status: number;
   details?: unknown;
+  /** When set, the HTTP JSON body uses `{ error: publicErrorCode, message }` instead of `{ error: message }`. */
+  publicErrorCode?: string;
 
-  constructor(status: number, message: string, details?: unknown) {
+  constructor(status: number, message: string, details?: unknown, publicErrorCode?: string) {
     super(message);
     this.status = status;
     this.details = details;
+    this.publicErrorCode = publicErrorCode;
   }
 }
 

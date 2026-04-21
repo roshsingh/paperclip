@@ -49,10 +49,18 @@ export function errorHandler(
       const tc = getTelemetryClient();
       if (tc) trackErrorHandlerCrash(tc, { errorCode: err.name });
     }
-    res.status(err.status).json({
-      error: err.message,
-      ...(err.details ? { details: err.details } : {}),
-    });
+    const body =
+      err.publicErrorCode != null && err.publicErrorCode !== ""
+        ? {
+            error: err.publicErrorCode,
+            message: err.message,
+            ...(err.details ? { details: err.details } : {}),
+          }
+        : {
+            error: err.message,
+            ...(err.details ? { details: err.details } : {}),
+          };
+    res.status(err.status).json(body);
     return;
   }
 

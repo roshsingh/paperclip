@@ -108,6 +108,7 @@ import {
   writePaperclipSkillSyncPreference,
 } from "@paperclipai/adapter-utils/server-utils";
 import { extractSkillMentionIds } from "@paperclipai/shared";
+import { isTerminalHarnessIssueStatus } from "../lib/issue-terminal-status.js";
 
 const MAX_LIVE_LOG_CHUNK_BYTES = 8 * 1024;
 const MAX_PERSISTED_LOG_CHUNK_CHARS = 64 * 1024;
@@ -1216,6 +1217,8 @@ function shouldAutoCheckoutIssueForWake(input: {
   if (input.issueAssigneeAgentId !== input.agentId) return false;
 
   const issueStatus = readNonEmptyString(input.issueStatus);
+  if (isTerminalHarnessIssueStatus(issueStatus)) return false;
+
   if (
     issueStatus !== "todo" &&
     issueStatus !== "backlog" &&
@@ -1243,7 +1246,10 @@ function shouldQueueFollowupForRunningIssueWake(input: {
 }
 
 function isCheckoutConflictError(error: unknown): boolean {
-  return error instanceof HttpError && error.status === 409 && error.message === "Issue checkout conflict";
+  if (!(error instanceof HttpError) || error.status !== 409) return false;
+  if (error.message === "Issue checkout conflict") return true;
+  if (error.publicErrorCode === "ISSUE_TERMINAL") return true;
+  return false;
 }
 
 function deriveCommentId(
@@ -3918,7 +3924,9 @@ export function heartbeatService(db: Db) {
     const sessionCodec = getAdapterSessionCodec(agent.adapterType);
     const issueId = readNonEmptyString(context.issueId);
     let issueContext = issueId ? await getIssueExecutionContext(agent.companyId, issueId) : null;
-    if (
+    if (issueId && issueContext && isTerminalHarnessIssueStatus(issueContext.status)) {
+      context[PAPERCLIP_HARNESS_CHECKOUT_KEY] = false;
+    } else if (
       issueId &&
       issueContext &&
       shouldAutoCheckoutIssueForWake({
