@@ -57,7 +57,7 @@ variable "db_deletion_protection" {
 
 variable "db_engine_version" {
   type    = string
-  default = "17"
+  default = "17.2"
 }
 
 variable "db_performance_insights" {

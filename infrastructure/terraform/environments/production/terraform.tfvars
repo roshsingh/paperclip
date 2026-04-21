@@ -5,6 +5,6 @@ environment = "production"
 aws_region  = "us-east-1"
 hostname    = "area51.robowise.ai"
 
-db_password = "" # use TF_VAR_db_password
+# db_password: set via TF_VAR_db_password or -var flag
 
 alarm_email = ""
