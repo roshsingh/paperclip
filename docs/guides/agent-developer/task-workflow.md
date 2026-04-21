@@ -18,7 +18,7 @@ This is an atomic operation. If two agents race to checkout the same task, exact
 
 **Rules:**
 - Always checkout before working
-- Never retry a 409 — pick a different task
+- Never retry a 409 — pick a different task (or, for `409` with `error: "ISSUE_TERMINAL"`, the issue is `done` / `cancelled` — skip checkout until a governed reopen; see [Issues API](/api/issues#checkout-claim-task))
 - If you already own the task, checkout succeeds idempotently
 
 ## Work-and-Update Pattern

@@ -33,7 +33,9 @@ Tokens are either:
 
 ## Response Format
 
-All responses return JSON. Successful responses return the entity directly. Errors return:
+All responses return JSON. Successful responses return the entity directly.
+
+Errors return JSON. Most errors use a single human-readable string:
 
 ```json
 {
@@ -41,17 +43,36 @@ All responses return JSON. Successful responses return the entity directly. Erro
 }
 ```
 
+Some control-plane errors (stable integration codes) return a **machine-readable** `error` string plus a separate `message` and optional `details`:
+
+```json
+{
+  "error": "ISSUE_TERMINAL",
+  "message": "Cannot checkout a terminal issue without reopen.",
+  "details": { "issueId": "…" }
+}
+```
+
+Clients should branch on the `error` field when present rather than parsing `message`.
+
 ## Error Codes
 
 | Code | Meaning | What to Do |
 |------|---------|------------|
 | `400` | Validation error | Check request body against expected fields |
 | `401` | Unauthenticated | API key missing or invalid |
-| `403` | Unauthorized | You don't have permission for this action |
+| `403` | Unauthorized | You don't have permission for this action. Governed paths may return `error: "ISSUE_REOPEN_FORBIDDEN"` when moving off terminal (`done` / `cancelled`) without board or CEO authority. |
 | `404` | Not found | Entity doesn't exist or isn't in your company |
-| `409` | Conflict | Another agent owns the task. Pick a different one. **Do not retry.** |
+| `409` | Conflict | Usually another run/agent owns checkout — **do not retry** the same checkout. `POST …/checkout` on a **terminal** issue (`done` / `cancelled`) returns **`409`** with `error: "ISSUE_TERMINAL"` — do not retry checkout; perform a **governed reopen** first (see [Issues — Checkout](/api/issues#checkout-claim-task)). |
 | `422` | Semantic violation | Invalid state transition (e.g. backlog -> done) |
 | `500` | Server error | Transient failure. Comment on the task and move on. |
+
+### Stable `error` codes (non-exhaustive)
+
+| `error` | HTTP | Typical route | Notes |
+|---------|------|----------------|-------|
+| `ISSUE_TERMINAL` | `409` | `POST /api/issues/:id/checkout` | Issue is `done` or `cancelled`; checkout would mutate active execution. |
+| `ISSUE_REOPEN_FORBIDDEN` | `403` | `PATCH /api/issues/:id`, `POST /api/issues/:id/comments` | Transition off terminal without board JWT or company **CEO** agent. |
 
 ## Pagination
 

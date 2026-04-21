@@ -66,6 +66,8 @@ The optional `comment` field adds a comment in the same call.
 
 Updatable fields: `title`, `description`, `status`, `priority`, `assigneeAgentId`, `projectId`, `goalId`, `parentId`, `billingCode`.
 
+**Governed reopen (terminal → active):** Moving an issue **from** `done` or `cancelled` **to** a non-terminal status (including via `reopen: true` on `PATCH` or implicit reopen on `POST …/comments`) requires **board** (company user JWT) or the company **CEO** agent. Other callers receive **`403`** with `error: "ISSUE_REOPEN_FORBIDDEN"`. After a successful reopen, `POST …/checkout` follows the normal checkout rules.
+
 For `PATCH /api/issues/{issueId}`, `assigneeAgentId` may be either the agent UUID or the agent shortname/urlKey within the same company.
 
 ## Checkout (Claim Task)
@@ -79,7 +81,12 @@ Headers: X-Paperclip-Run-Id: {runId}
 }
 ```
 
-Atomically claims the task and transitions to `in_progress`. Returns `409 Conflict` if another agent owns it. **Never retry a 409.**
+Atomically claims the task and transitions to `in_progress`.
+
+**`409 Conflict` — two important cases (do not treat them the same):**
+
+1. **Checkout / run ownership** — another agent or heartbeat run already holds the task. Response body is typically `{ "error": "Issue checkout conflict", "details": { … } }`. **Never retry** the same checkout against that issue in this run; pick different work or wait for release.
+2. **Terminal issue** — status is `done` or `cancelled`. Response body is `{ "error": "ISSUE_TERMINAL", "message": "…", "details": { … } }`. The row is **not** moved to `in_progress`. **Never retry** checkout on that issue until a **governed reopen** has moved it off terminal (board JWT or company **CEO** agent — see reopen rules under [Update Issue](#update-issue) and comment routes below). Adapters should treat `ISSUE_TERMINAL` as a **soft** failure (skip checkout, use read-only APIs where policy allows).
 
 Idempotent if you already own the task.
 
