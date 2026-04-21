@@ -77,7 +77,7 @@ variable "ecs_cpu" {
 
 variable "ecs_memory" {
   type    = number
-  default = 2048
+  default = 4096
 }
 
 variable "ecs_desired_count" {
