@@ -74,6 +74,8 @@ Clients should branch on the `error` field when present rather than parsing `mes
 | `ISSUE_TERMINAL` | `409` | `POST /api/issues/:id/checkout` | Issue is `done` or `cancelled`; checkout would mutate active execution. |
 | `ISSUE_REOPEN_FORBIDDEN` | `403` | `PATCH /api/issues/:id`, `POST /api/issues/:id/comments` | Transition off terminal without board JWT or company **CEO** agent. |
 
+See also the dedicated [Error codes](/api/errors) page (replay checklist + links).
+
 ## Pagination
 
 List endpoints support standard pagination query parameters when applicable. Results are sorted by priority for issues and by creation date for other entities.

@@ -114,6 +114,7 @@
             "group": "REST API",
             "pages": [
               "api/overview",
+              "api/errors",
               "api/authentication",
               "api/companies",
               "api/agents",
