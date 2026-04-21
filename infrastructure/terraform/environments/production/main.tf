@@ -50,6 +50,10 @@ resource "aws_secretsmanager_secret" "anthropic_api_key" {
   name = "paperclip/${var.environment}/anthropic-api-key"
 }
 
+resource "aws_secretsmanager_secret" "claude_oauth_token" {
+  name = "paperclip/${var.environment}/claude-oauth-token"
+}
+
 resource "aws_secretsmanager_secret_version" "better_auth" {
   secret_id     = aws_secretsmanager_secret.better_auth.id
   secret_string = random_password.better_auth.result
@@ -79,7 +83,7 @@ module "security" {
   secret_arns = [
     aws_secretsmanager_secret.database_url.arn,
     aws_secretsmanager_secret.better_auth.arn,
-    aws_secretsmanager_secret.anthropic_api_key.arn,
+    aws_secretsmanager_secret.claude_oauth_token.arn,
   ]
 }
 
@@ -190,7 +194,7 @@ locals {
   ecs_secrets = [
     { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn },
     { name = "BETTER_AUTH_SECRET", valueFrom = aws_secretsmanager_secret.better_auth.arn },
-    { name = "ANTHROPIC_API_KEY", valueFrom = aws_secretsmanager_secret.anthropic_api_key.arn },
+    { name = "CLAUDE_CODE_OAUTH_TOKEN", valueFrom = aws_secretsmanager_secret.claude_oauth_token.arn },
   ]
 }
 
