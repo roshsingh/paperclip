@@ -88,6 +88,10 @@ resource "aws_ecs_task_definition" "paperclip" {
           { name = "PAPERCLIP_API_URL", value = var.paperclip_public_url },
           { name = "PAPERCLIP_TELEMETRY_DISABLED", value = "1" },
           { name = "NODE_TLS_REJECT_UNAUTHORIZED", value = "0" },
+          { name = "GIT_AUTHOR_NAME", value = "Rosh Singh" },
+          { name = "GIT_AUTHOR_EMAIL", value = "roshsingh81@gmail.com" },
+          { name = "GIT_COMMITTER_NAME", value = "Rosh Singh" },
+          { name = "GIT_COMMITTER_EMAIL", value = "roshsingh81@gmail.com" },
         ],
         var.paperclip_allowed_hostnames != "" ? [{ name = "PAPERCLIP_ALLOWED_HOSTNAMES", value = var.paperclip_allowed_hostnames }] : []
       )
